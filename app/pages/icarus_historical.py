@@ -59,7 +59,6 @@ def render_icarus_historical():
             # Refresh button
             if st.button("🔄 Refresh Data", use_container_width=True, key="refresh_btn"):
                 clear_all_cache()
-                get_master_data()
                 st.success("Cache cleared!")
                 st.rerun()
             
