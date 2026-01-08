@@ -14,7 +14,8 @@ from bigquery_client import (
     load_pivot_data,
     load_chart_data,
     clear_all_cache,
-    get_cache_info
+    get_cache_info,
+    get_master_data
 )
 from filters import render_filters
 from pivots import render_pivot_table
@@ -58,6 +59,7 @@ def render_icarus_historical():
             # Refresh button
             if st.button("🔄 Refresh Data", use_container_width=True, key="refresh_btn"):
                 clear_all_cache()
+                get_master_data(force_refresh=True)
                 st.success("Cache cleared!")
                 st.rerun()
             

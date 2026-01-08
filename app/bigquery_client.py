@@ -222,7 +222,7 @@ def get_master_data():
     2. GCS (fast - 1-2 seconds)
     3. BigQuery (slow - 10-30 seconds)
     """
-    
+    log_debug(f"get_master_data...")
     # Level 1: Check session state (same browser session)
     if "master_data" in st.session_state and st.session_state.master_data is not None:
         if "master_data_time" in st.session_state:
