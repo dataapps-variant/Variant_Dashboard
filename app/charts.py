@@ -265,4 +265,74 @@ def render_chart_pair(chart_data_regular, chart_data_crystal, display_name, form
     
     col1, col2 = st.columns(2)
     
-    # Chart configuration with zoom, pan, and download e
+    # Chart configuration with zoom, pan, and download enabled
+    chart_config = {
+        'displayModeBar': True,
+        'displaylogo': False,
+        'modeBarButtonsToAdd': ['downloadCsv'],
+        'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
+        'toImageButtonOptions': {
+            'format': 'png',
+            'filename': f'{display_name}_chart',
+            'height': 600,
+            'width': 800,
+            'scale': 2
+        },
+        'scrollZoom': False
+    }
+    
+    # Regular chart
+    with col1:
+        st.markdown(
+            f'<div style="font-size:16px;font-weight:600;color:{colors["text_primary"]};margin-bottom:12px;">{display_name}</div>',
+            unsafe_allow_html=True
+        )
+        
+        fig_regular, plans_regular = build_line_chart(
+            chart_data_regular, 
+            display_name, 
+            format_type,
+            date_range,
+            subscriptions_data=subscriptions_regular,
+            is_subscriptions_chart=is_subscriptions_chart
+        )
+        
+        # Render legend
+        if plans_regular:
+            color_map = build_plan_color_map(plans_regular)
+            st.markdown(build_legend_html(plans_regular, color_map), unsafe_allow_html=True)
+        
+        st.plotly_chart(
+            fig_regular, 
+            use_container_width=True, 
+            config=chart_config,
+            key=f"{chart_key}_regular"
+        )
+    
+    # Crystal Ball chart
+    with col2:
+        st.markdown(
+            f'<div style="font-size:16px;font-weight:600;color:{colors["text_primary"]};margin-bottom:12px;">{display_name} (Crystal Ball)</div>',
+            unsafe_allow_html=True
+        )
+        
+        fig_crystal, plans_crystal = build_line_chart(
+            chart_data_crystal, 
+            f"{display_name} (Crystal Ball)", 
+            format_type,
+            date_range,
+            subscriptions_data=subscriptions_crystal,
+            is_subscriptions_chart=is_subscriptions_chart
+        )
+        
+        # Render legend
+        if plans_crystal:
+            color_map = build_plan_color_map(plans_crystal)
+            st.markdown(build_legend_html(plans_crystal, color_map), unsafe_allow_html=True)
+        
+        st.plotly_chart(
+            fig_crystal, 
+            use_container_width=True, 
+            config=chart_config,
+            key=f"{chart_key}_crystal"
+        )
