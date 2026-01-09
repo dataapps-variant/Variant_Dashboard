@@ -82,18 +82,19 @@ def get_plan_color(plan_name, plan_index_in_app=0):
     app_name = get_app_from_plan(plan_name)
     base_color = APP_COLORS.get(app_name, "#6B7280")  # Default gray if unknown
     
-    # Generate shade based on index
+    # Option B: Alternate Light-Dark pattern for maximum contrast
+    # Consecutive plans have very different shades
     shade_pattern = [
         0,      # Base color
-        0.15,   # Lighter 15%
-        -0.15,  # Darker 15%
-        0.30,   # Lighter 30%
-        -0.30,  # Darker 30%
-        0.45,   # Lighter 45%
-        -0.45,  # Darker 45%
-        0.20,   # Lighter 20%
-        -0.20,  # Darker 20%
-        0.35,   # Lighter 35%
+        -0.35,  # 35% darker (very different from index 0)
+        0.35,   # 35% lighter (very different from index 1)
+        -0.55,  # 55% darker
+        0.55,   # 55% lighter
+        -0.25,  # 25% darker
+        0.25,   # 25% lighter
+        -0.45,  # 45% darker
+        0.45,   # 45% lighter
+        -0.15,  # 15% darker
     ]
     
     shade_index = plan_index_in_app % len(shade_pattern)
