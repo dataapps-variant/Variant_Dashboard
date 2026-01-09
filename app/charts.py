@@ -235,7 +235,7 @@ def render_chart_pair(chart_data_regular, chart_data_crystal, display_name, form
         'toImageButtonOptions': {
             'format': 'png',
             'filename': f'{display_name}_chart',
-            'height': 500,
+            'height': 600,
             'width': 800,
             'scale': 2
         },
