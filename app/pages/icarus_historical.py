@@ -17,7 +17,7 @@ from bigquery_client import (
     load_date_bounds,
     load_plan_groups,
     load_pivot_data,
-    load_all_chart_data,  # NEW: Batch loading function
+    load_all_chart_data,
     refresh_bq_to_staging,
     refresh_gcs_from_staging,
     get_cache_info
@@ -156,7 +156,7 @@ def render_dashboard_content_optimized(active_inactive, key_prefix):
     # ==========================================================================
     # FILTERS
     # ==========================================================================
-(
+    (
         from_date, to_date, selected_bc, selected_cohort,
         selected_metrics, selected_plans, apply_clicked
     ) = render_filters(plan_groups, min_date, max_date, key_prefix)
@@ -168,7 +168,7 @@ def render_dashboard_content_optimized(active_inactive, key_prefix):
         st.warning("⚠️ Please select at least one Metric.")
         return
     
-  if not selected_plans:
+    if not selected_plans:
         st.warning("⚠️ Please select at least one Plan.")
         return
     
