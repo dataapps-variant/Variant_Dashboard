@@ -13,6 +13,7 @@ Features:
 - No text wrapping by default, wraps if user resizes smaller
 - Excel-like filter/sort ONLY on App, Plan, Metric
 - Single scrollable table (no pagination)
+- Auto-size columns to fit content
 """
 
 import streamlit as st
@@ -171,20 +172,26 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
     buffer.seek(0)
     excel_data = buffer.getvalue()
     
-    # Title row with menu on same line
-    title_col, menu_col = st.columns([6, 1])
-    
-    with title_col:
-        st.markdown(f'''
+    # Title row
+    st.markdown(f'''
+    <div style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    ">
         <div style="
             font-size: 16px;
             font-weight: 600;
             color: {colors['text_primary']};
-            margin-bottom: 8px;
         ">{title}</div>
-        ''', unsafe_allow_html=True)
+    </div>
+    ''', unsafe_allow_html=True)
     
-    with menu_col:
+    # Menu button aligned right
+    col_spacer, col_menu = st.columns([14, 1])
+    
+    with col_menu:
         with st.popover("⋮"):
             st.markdown("**Export Options**")
             
@@ -207,6 +214,21 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
                 key=f"{table_id}_excel_export",
                 use_container_width=True
             )
+            
+            st.markdown("---")
+            
+            st.markdown(f'''
+            <a href="#top" style="text-decoration: none;">
+                <div style="
+                    background: {colors['accent']};
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    text-align: center;
+                    cursor: pointer;
+                ">⬆️ Scroll to Top</div>
+            </a>
+            ''', unsafe_allow_html=True)
     
     # Configure AG Grid
     gb = GridOptionsBuilder.from_dataframe(df.drop(columns=["_metric_key"], errors='ignore'))
@@ -297,66 +319,62 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
     }
     """)
     
-    # App column - 150px, frozen, with filter/sort, LEFT aligned
+    # App column - frozen, with filter/sort
     gb.configure_column(
         "App",
         pinned="left",
-        width=150,
-        minWidth=100,
+        minWidth=60,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
         wrapText=True,
         autoHeight=False,
-        cellStyle={'textAlign': 'left', 'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
+        cellStyle={'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
         filterParams={
             'buttons': ['reset', 'apply'],
             'closeOnApply': True
         }
     )
     
-    # Plan column - 150px, frozen, with filter/sort, LEFT aligned
+    # Plan column - frozen, with filter/sort
     gb.configure_column(
         "Plan",
         pinned="left",
-        width=150,
-        minWidth=100,
+        minWidth=80,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
         wrapText=True,
         autoHeight=False,
-        cellStyle={'textAlign': 'left', 'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
+        cellStyle={'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
         filterParams={
             'buttons': ['reset', 'apply'],
             'closeOnApply': True
         }
     )
     
-    # Metric column - 180px, frozen, with filter/sort, LEFT aligned
+    # Metric column - frozen, with filter/sort
     gb.configure_column(
         "Metric",
         pinned="left",
-        width=180,
-        minWidth=120,
+        minWidth=100,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
         wrapText=True,
         autoHeight=False,
-        cellStyle={'textAlign': 'left', 'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
+        cellStyle={'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
         filterParams={
             'buttons': ['reset', 'apply'],
             'closeOnApply': True
         }
     )
     
-    # Trend column - 180px, frozen, NO filter/sort, CENTER aligned
+    # Trend column - frozen, NO filter/sort
     gb.configure_column(
         "Trend",
         pinned="left",
-        width=180,
-        minWidth=100,
+        minWidth=80,
         filter=False,
         sortable=False,
         suppressMenu=True,
@@ -364,7 +382,7 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         headerName="Trend"
     )
     
-    # Number formatter for values
+    # Number formatter for Indian number system
     number_formatter = JsCode("""
         function(params) {
             if (params.value === null || params.value === undefined || params.value === '') return '';
@@ -374,7 +392,7 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         }
     """)
     
-    # Date columns - 100px each, NO filter/sort, RIGHT aligned
+    # Date columns - NO filter/sort
     for date_col in date_columns:
         gb.configure_column(
             date_col,
@@ -383,12 +401,18 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
             sortable=False,
             suppressMenu=True,
             valueFormatter=number_formatter,
-            width=100,
-            minWidth=80,
+            minWidth=70,
             wrapText=True,
             autoHeight=False,
-            cellStyle={'textAlign': 'right', 'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'}
+            cellStyle={'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'}
         )
+    
+    # Auto-size columns callback
+    on_first_data_rendered = JsCode("""
+        function(params) {
+            params.api.autoSizeAllColumns();
+        }
+    """)
     
     # Grid options - NO pagination
     gb.configure_grid_options(
@@ -400,7 +424,8 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         suppressRowClickSelection=True,
         enableCellTextSelection=True,
         ensureDomOrder=True,
-        suppressPaginationPanel=True
+        suppressPaginationPanel=True,
+        onFirstDataRendered=on_first_data_rendered
     )
     
     gb.configure_pagination(enabled=False)
