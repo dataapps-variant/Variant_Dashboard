@@ -1,8 +1,10 @@
-# Cloud Build configuration for deploying to Cloud Run
-# With GCS persistent caching for data
+# Cloud Build configuration - OPTIMIZED
+# Key changes:
+# 1. Reduced concurrency (Streamlit is stateful)
+# 2. Minimum 1 instance (no cold starts)
+# 3. Better startup probe settings
 
 steps:
-  # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -12,18 +14,13 @@ steps:
       - 'gcr.io/$PROJECT_ID/variant-dashboard:latest'
       - '.'
 
-  # Push the Docker image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/variant-dashboard:$COMMIT_SHA'
+    args: ['push', 'gcr.io/$PROJECT_ID/variant-dashboard:$COMMIT_SHA']
 
   - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/variant-dashboard:latest'
+    args: ['push', 'gcr.io/$PROJECT_ID/variant-dashboard:latest']
 
-  # Deploy to Cloud Run with GCS cache bucket
+  # Deploy with OPTIMIZED settings
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -36,32 +33,38 @@ steps:
       - 'us-central1'
       - '--platform'
       - 'managed'
+      # OPTIMIZED: More memory for data caching
       - '--memory'
-      - '2Gi'
+      - '4Gi'
+      # OPTIMIZED: 2 CPUs is usually enough
       - '--cpu'
       - '2'
+      # Keep timeout reasonable
       - '--timeout'
       - '300'
+      # CRITICAL: Lower concurrency for Streamlit
+      # Each Streamlit session needs dedicated resources
       - '--concurrency'
-      - '80'
-      - '--min-instances'
-      - '0'
-      - '--max-instances'
       - '10'
+      # CRITICAL: Minimum 1 instance to avoid cold starts
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '5'
       - '--allow-unauthenticated'
       - '--service-account'
       - 'variant-dashboard-sa@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
       - 'GCS_CACHE_BUCKET=variant-dashboard-cache-$PROJECT_ID'
+      # CPU always allocated (no throttling between requests)
+      - '--cpu-boost'
+      - '--no-cpu-throttling'
 
-# Store images in Container Registry
 images:
   - 'gcr.io/$PROJECT_ID/variant-dashboard:$COMMIT_SHA'
   - 'gcr.io/$PROJECT_ID/variant-dashboard:latest'
 
-# Build timeout
 timeout: '1200s'
 
-# Build options
 options:
   logging: CLOUD_LOGGING_ONLY
