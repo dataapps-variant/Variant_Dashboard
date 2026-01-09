@@ -5,14 +5,14 @@ OPTIMIZED VERSION - Changes made:
 1. Removed sparklines/Trend column
 2. Removed Excel export (CSV only)
 3. Removed JsCode valueFormatter (using built-in)
-4. Added @st.cache_data for data processing
-5. Set animateRows=False
-6. Set enableRangeSelection=False
-7. Simplified CSS (removed 2 minor rules)
-8. Kept frozen columns (App, Plan, Metric) with built-in pinned="left"
-9. 2 decimal places for all numbers
-10. Right-aligned date columns
-11. Flex sizing for frozen columns (auto-adjust width)
+4. Set animateRows=False
+5. Set enableRangeSelection=False
+6. Simplified CSS (removed 2 minor rules)
+7. Kept frozen columns (App, Plan, Metric) with built-in pinned="left"
+8. 2 decimal places for all numbers
+9. Right-aligned date columns
+10. Smart fixed widths for frozen columns
+11. REMOVED @st.cache_data from process_pivot_data_for_aggrid (was causing stuck pivot bug)
 """
 
 import streamlit as st
@@ -46,15 +46,13 @@ def get_display_metric_name(metric_name):
     return f"{display}{suffix}"
 
 
-@st.cache_data(ttl=1800)
-def process_pivot_data_for_aggrid(_pivot_data, selected_metrics):
+def process_pivot_data_for_aggrid(pivot_data, selected_metrics):
     """
     Process pivot data into flat DataFrame for AG Grid
-    CACHED for 30 minutes
     
-    Note: _pivot_data has underscore prefix to tell Streamlit not to hash it
+    NOTE: NO @st.cache_data here - was causing stuck pivot bug!
+    The heavy caching is done at BigQuery/GCS level, this function is fast.
     """
-    pivot_data = _pivot_data
     
     if not pivot_data or "Reporting_Date" not in pivot_data or len(pivot_data["Reporting_Date"]) == 0:
         return None, []
@@ -145,13 +143,13 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
     - No range selection (enableRangeSelection=False)
     - 2 decimal places for numbers
     - Right-aligned date columns
-    - Flex sizing for frozen columns
+    - Smart fixed widths for frozen columns
     """
     
     colors = get_theme_colors()
     theme = get_current_theme()
     
-    # Process data (CACHED)
+    # Process data (NO caching here - fixes stuck pivot bug)
     df, date_columns = process_pivot_data_for_aggrid(pivot_data, selected_metrics)
     
     if df is None or df.empty:
@@ -197,11 +195,12 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         autoHeight=False
     )
     
-    # App column - frozen, with filter/sort, flex sizing
+    # App column - frozen, smart fixed width (max 10 chars)
     gb.configure_column(
         "App",
         pinned="left",
-        flex=1,  # Flex sizing - auto adjusts
+        minWidth=80,
+        maxWidth=100,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
@@ -211,11 +210,12 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         }
     )
     
-    # Plan column - frozen, with filter/sort, flex sizing
+    # Plan column - frozen, smart fixed width (max 17 chars)
     gb.configure_column(
         "Plan",
         pinned="left",
-        flex=2,  # Flex sizing - auto adjusts
+        minWidth=130,
+        maxWidth=150,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
@@ -225,11 +225,12 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         }
     )
     
-    # Metric column - frozen, with filter/sort, flex sizing
+    # Metric column - frozen, smart fixed width (max 26 chars)
     gb.configure_column(
         "Metric",
         pinned="left",
-        flex=2,  # Flex sizing - auto adjusts
+        minWidth=200,
+        maxWidth=220,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
@@ -267,7 +268,7 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
     
     grid_options = gb.build()
     
-    # Custom CSS - SIMPLIFIED (removed .ag-icon and .ag-header-cell-menu-button)
+    # Custom CSS - SIMPLIFIED
     custom_css = {
         ".ag-root-wrapper": {
             "border-radius": "8px !important",
