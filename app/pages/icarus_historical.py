@@ -38,7 +38,7 @@ def render_icarus_historical():
     # ==========================================================================
     # HEADER
     # ==========================================================================
-    header_col1, header_col2, header_col3 = st.columns([1, 4, 1])
+    header_col1, header_col2, header_col3, header_col4 = st.columns([1, 6, 1, 1])
     
     with header_col1:
         if st.button("← Back", key="back_btn"):
@@ -47,65 +47,59 @@ def render_icarus_historical():
     
     with header_col2:
         st.markdown(
-            f'<h1 style="text-align:center;font-size:22px;font-weight:600;color:{colors["text_primary"]};margin:0;padding:10px 0;">ICARUS - Plan (Historical)</h1>',
+            f'<h1 style="text-align:center;font-size:28px;font-weight:700;color:{colors["text_primary"]};margin:0;padding:10px 0;">ICARUS - Plan (Historical)</h1>',
             unsafe_allow_html=True
         )
     
     with header_col3:
-        with st.popover("⋮"):
-            st.markdown("**Export**")
-            if st.button("📄 Export Full Dashboard as PDF", use_container_width=True, key="export_pdf"):
-                st.info("PDF export - Coming soon")
-            
-            st.markdown("---")
-            theme_icon = "☀️" if current_theme == "dark" else "🌙"
-            theme_text = "Light Mode" if current_theme == "dark" else "Dark Mode"
-            if st.button(f"{theme_icon} {theme_text}", use_container_width=True, key="theme_toggle"):
-                toggle_theme()
-                st.rerun()
-            
-            st.markdown("---")
-            st.markdown(f"**User:** {user['name']}")
-            if st.button("🚪 Logout", use_container_width=True, key="logout_btn"):
-                logout()
-                st.rerun()
+        theme_icon = "☀️" if current_theme == "dark" else "🌙"
+        if st.button(theme_icon, key="theme_toggle"):
+            toggle_theme()
+            st.rerun()
+    
+    with header_col4:
+        if st.button("Logout", key="logout_btn"):
+            logout()
+            st.rerun()
     
     # ==========================================================================
     # REFRESH SECTION
     # ==========================================================================
-    st.markdown("<br>", unsafe_allow_html=True)
+    refresh_col1, refresh_col2, refresh_col3 = st.columns([1, 4, 1])
     
-    refresh_col1, refresh_col2 = st.columns([3, 2])
+    with refresh_col1:
+        bq_btn_col, bq_txt_col = st.columns([1, 4])
+        with bq_btn_col:
+            if st.button("🔄", key="refresh_bq"):
+                with st.spinner("Querying BigQuery..."):
+                    success, msg = refresh_bq_to_staging()
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+                    st.rerun()
+        with bq_txt_col:
+            st.markdown(
+                f'<span style="font-size:13px;color:{colors["text_secondary"]};">BQ: {cache_info.get("last_bq_refresh", "--")}</span>',
+                unsafe_allow_html=True
+            )
     
-    with refresh_col2:
-        with st.container():
-            st.markdown("**🔄 Data Refresh**")
-            
-            bq_col1, bq_col2 = st.columns([1, 1])
-            with bq_col1:
-                if st.button("Refresh BQ", key="refresh_bq", use_container_width=True):
-                    with st.spinner("Querying BigQuery..."):
-                        success, msg = refresh_bq_to_staging()
-                        if success:
-                            st.success(msg)
-                        else:
-                            st.error(msg)
-                        st.rerun()
-            with bq_col2:
-                st.caption(f"Last: {cache_info.get('last_bq_refresh', '--')}")
-            
-            gcs_col1, gcs_col2 = st.columns([1, 1])
-            with gcs_col1:
-                if st.button("Refresh GCS", key="refresh_gcs", use_container_width=True):
-                    with st.spinner("Loading from staging..."):
-                        success, msg = refresh_gcs_from_staging()
-                        if success:
-                            st.success(msg)
-                        else:
-                            st.error(msg)
-                        st.rerun()
-            with gcs_col2:
-                st.caption(f"Last: {cache_info.get('last_gcs_refresh', '--')}")
+    with refresh_col3:
+        gcs_txt_col, gcs_btn_col = st.columns([4, 1])
+        with gcs_txt_col:
+            st.markdown(
+                f'<span style="font-size:13px;color:{colors["text_secondary"]};text-align:right;display:block;">GCS: {cache_info.get("last_gcs_refresh", "--")}</span>',
+                unsafe_allow_html=True
+            )
+        with gcs_btn_col:
+            if st.button("🔄", key="refresh_gcs"):
+                with st.spinner("Loading from staging..."):
+                    success, msg = refresh_gcs_from_staging()
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+                    st.rerun()
     
     # ==========================================================================
     # TABS
