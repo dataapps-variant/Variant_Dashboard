@@ -100,7 +100,7 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
     
     # Line opacity for semi-transparency
     LINE_OPACITY = 0.7
-    LINE_WIDTH = 1  # Thin lines
+    LINE_WIDTH = 1.5  # Thin lines
     
     # Add trace for each plan
     for plan in unique_plans:
