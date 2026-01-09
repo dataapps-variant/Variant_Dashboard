@@ -4,7 +4,7 @@ Chart Components for Variant Analytics Dashboard
 Customizations:
 - Zoom & Pan enabled
 - Download CSV button
-- Thin lines (1px) with semi-transparency
+- Thin lines (1.5px) with semi-transparency
 - X-axis: Month Year format (Jan 2024)
 - Tooltip: Full date on hover
 - Lines start from first data point
