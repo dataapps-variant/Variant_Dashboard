@@ -205,15 +205,18 @@ def apply_theme():
         border-color: {colors['accent']} !important;
         box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.2) !important;
     }}
+   .stCheckbox {{
+        margin-bottom: -10px !important;
+    }}
     
     .stCheckbox > label {{
         color: {colors['text_primary']} !important;
+        padding: 2px 0 !important;
     }}
     
     .stCheckbox > label > span[data-testid="stCheckboxLabel"] {{
         color: {colors['text_primary']} !important;
     }}
-    
     .stTabs [data-baseweb="tab-list"] {{
         gap: 0 !important;
         background: {colors['surface']} !important;
