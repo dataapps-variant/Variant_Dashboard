@@ -1,16 +1,11 @@
 """
 Landing Page (Dashboard Hub) for Variant Analytics Dashboard
 - Logo + "VARIANT GROUP" + "Welcome back, {username}"
-- Dashboard table using Streamlit components
+- Dashboard table with clickable names for enabled dashboards
 - Centered with max-width
-- Disabled dashboards: same appearance, cursor: not-allowed
-- Settings menu (⋮) with Light Mode toggle, Admin Panel (admin only), User info, Logout
-
-FIXED: Using Streamlit native components instead of raw HTML tables
 """
 
 import streamlit as st
-import pandas as pd
 from auth import get_current_user, logout, is_admin
 from theme import get_theme_colors, toggle_theme, get_current_theme, render_logo_header
 from config import DASHBOARDS
@@ -66,59 +61,35 @@ def render_landing_page():
     bq_refresh = cache_info.get("last_bq_refresh", "--")
     gcs_refresh = cache_info.get("last_gcs_refresh", "--")
     
-    # Build dashboard data
-    dashboard_data = []
+    # Display dashboard table
+    st.subheader("📊 Available Dashboards")
+    
+    # Table header
+    header_cols = st.columns([3, 2, 2, 2])
+    header_cols[0].markdown(f"**Dashboard**")
+    header_cols[1].markdown(f"**Status**")
+    header_cols[2].markdown(f"**Last BQ Refresh**")
+    header_cols[3].markdown(f"**Last GCS Refresh**")
+    
+    st.markdown(f"<hr style='margin:5px 0 10px 0;border:none;border-top:1px solid {colors['border']};'>", unsafe_allow_html=True)
+    
+    # Table rows
     for dashboard in DASHBOARDS:
         is_enabled = dashboard.get("enabled", False)
         status = "✅ Active" if is_enabled else "⏸️ Disabled"
         bq_display = bq_refresh if is_enabled else "--"
         gcs_display = gcs_refresh if is_enabled else "--"
         
-        dashboard_data.append({
-            "Dashboard": dashboard["name"],
-            "Status": status,
-            "Last BQ Refresh": bq_display,
-            "Last GCS Refresh": gcs_display
-        })
-    
-    # Display dashboard table
-    st.subheader("📊 Available Dashboards")
-    
-    df = pd.DataFrame(dashboard_data)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    # Navigation section
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(
-        f'<p style="text-align:center;color:{colors["text_secondary"]};font-size:14px;">Click a button below to open a dashboard:</p>',
-        unsafe_allow_html=True
-    )
-    
-    # Filter enabled dashboards
-    enabled_dashboards = [d for d in DASHBOARDS if d.get("enabled", False)]
-    disabled_dashboards = [d for d in DASHBOARDS if not d.get("enabled", False)]
-    
-    if enabled_dashboards:
-        # Create columns for enabled dashboards
-        num_cols = min(len(enabled_dashboards), 4)
-        cols = st.columns(num_cols)
+        row_cols = st.columns([3, 2, 2, 2])
         
-        for idx, dashboard in enumerate(enabled_dashboards):
-            with cols[idx % num_cols]:
-                if st.button(
-                    f"📊 {dashboard['name']}",
-                    key=f"nav_{dashboard['id']}",
-                    use_container_width=True,
-                    type="primary"
-                ):
+        with row_cols[0]:
+            if is_enabled:
+                if st.button(dashboard["name"], key=f"nav_{dashboard['id']}"):
                     st.session_state.current_page = dashboard['id']
                     st.rerun()
-    else:
-        st.info("No dashboards are currently enabled.")
-    
-    # Show disabled dashboards info
-    if disabled_dashboards:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.caption("Disabled dashboards:")
-        disabled_names = ", ".join([d["name"] for d in disabled_dashboards])
-        st.caption(disabled_names)
+            else:
+                st.markdown(dashboard["name"])
+        
+        row_cols[1].markdown(status)
+        row_cols[2].markdown(bq_display)
+        row_cols[3].markdown(gcs_display)
