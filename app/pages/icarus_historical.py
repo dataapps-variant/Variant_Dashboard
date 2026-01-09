@@ -219,6 +219,10 @@ def render_dashboard_content_optimized(active_inactive, key_prefix):
         # Extract metric names from CHART_METRICS
         chart_metric_names = [cm["metric"] for cm in CHART_METRICS]
         
+        # Ensure Subscriptions is included for tooltip display
+        if "Subscriptions" not in chart_metric_names:
+            chart_metric_names.append("Subscriptions")
+        
         # SINGLE batch load for ALL Regular charts
         with st.spinner("Loading chart data..."):
             try:
@@ -236,6 +240,10 @@ def render_dashboard_content_optimized(active_inactive, key_prefix):
                 return
         
         date_range = (from_date, to_date)
+        
+        # Get Subscriptions data for tooltip display
+        subs_regular = all_regular_data.get("Subscriptions", {"Plan_Name": [], "Reporting_Date": [], "metric_value": []})
+        subs_crystal = all_crystal_data.get("Subscriptions", {"Plan_Name": [], "Reporting_Date": [], "metric_value": []})
         
         # Render charts using pre-loaded data
         for idx, chart_config in enumerate(CHART_METRICS):
@@ -262,7 +270,9 @@ def render_dashboard_content_optimized(active_inactive, key_prefix):
                 display_title,
                 format_type,
                 date_range=date_range,
-                chart_key=chart_key
+                chart_key=chart_key,
+                subscriptions_regular=subs_regular,
+                subscriptions_crystal=subs_crystal
             )
             
             st.markdown("<br>", unsafe_allow_html=True)
