@@ -200,10 +200,16 @@ def render_filters(plan_groups, min_date, max_date, key_prefix=""):
                         selected = render_plan_group(app_name, plans, key_prefix)
                         selected_plans.extend(selected)
         
-        with main_cols[1]:
+     with main_cols[1]:
             selected_metrics = render_metrics_filter(key_prefix)
+        
+        # Bottom row: Apply Filter button at extreme right
+        st.markdown("<br>", unsafe_allow_html=True)
+        apply_col1, apply_col2 = st.columns([5, 1])
+        with apply_col2:
+            apply_clicked = st.button("✅ Apply Filter", key=f"{key_prefix}apply_btn", use_container_width=True)
     
-    return from_date, to_date, selected_bc, selected_cohort, selected_metrics, selected_plans
+    return from_date, to_date, selected_bc, selected_cohort, selected_metrics, selected_plans, apply_clicked
 
 
 def reset_filters(plan_groups, key_prefix=""):
