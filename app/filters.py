@@ -89,7 +89,7 @@ def render_metrics_filter(key_prefix=""):
     
     st.markdown('<div class="filter-title">Metrics</div>', unsafe_allow_html=True)
     
-    with st.container(height=350):
+    with st.container(height=420):
         # All checkbox
         st.checkbox(
             "All",
@@ -176,8 +176,6 @@ def render_filters(plan_groups, min_date, max_date, key_prefix=""):
             if st.button("🔄 Reset", key=f"{key_prefix}reset_btn", use_container_width=True):
                 reset_filters(plan_groups, key_prefix)
                 st.rerun()
-        
-        st.markdown("---")
         
         # Row 2: Plan Groups + Metrics
         # Calculate columns: up to 6 app columns + 1 metrics column
