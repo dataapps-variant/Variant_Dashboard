@@ -206,7 +206,7 @@ def apply_theme():
         box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.2) !important;
     }}
    .stCheckbox {{
-        margin-bottom: -10px !important;
+        margin-bottom: -15px !important;
     }}
     
     .stCheckbox > label {{
