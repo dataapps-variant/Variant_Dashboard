@@ -6,8 +6,8 @@ Customizations:
 - Download CSV button
 - Thin lines (1.5px) with semi-transparency
 - X-axis: Month Year format (Jan 2024)
-- Tooltip: Full date on hover
-- Lines start from first data point
+- Tooltip: Date at top, Color-Plan-Value-Subscriptions per row
+- Lines break where data is blank (no connecting gaps)
 """
 
 import plotly.graph_objects as go
@@ -43,7 +43,7 @@ def build_legend_html(plans, color_map):
     return html
 
 
-def build_line_chart(data, display_name, format_type="dollar", date_range=None):
+def build_line_chart(data, display_name, format_type="dollar", date_range=None, subscriptions_data=None, is_subscriptions_chart=False):
     """
     Build a line chart for a metric by Plan over time
     
@@ -52,6 +52,8 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
         display_name: Chart title
         format_type: 'dollar', 'percent', or 'number'
         date_range: Tuple of (min_date, max_date) for x-axis range
+        subscriptions_data: Dict with Plan_Name, Reporting_Date, metric_value for Subscriptions
+        is_subscriptions_chart: If True, don't show Subscriptions in tooltip (avoid duplicate)
     
     Returns:
         Plotly figure and list of unique plans
@@ -83,6 +85,15 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
     unique_plans = sorted(set(data["Plan_Name"]))
     color_map = build_plan_color_map(unique_plans)
     
+    # Build subscriptions lookup if provided
+    subs_lookup = {}
+    if subscriptions_data and not is_subscriptions_chart:
+        for i in range(len(subscriptions_data.get("Plan_Name", []))):
+            plan = subscriptions_data["Plan_Name"][i]
+            date = subscriptions_data["Reporting_Date"][i]
+            value = subscriptions_data["metric_value"][i]
+            subs_lookup[(plan, date)] = value
+    
     # Organize data by plan
     plan_data = {}
     for i in range(len(data["Plan_Name"])):
@@ -91,9 +102,13 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
         value = data["metric_value"][i]
         
         if plan not in plan_data:
-            plan_data[plan] = {"dates": [], "values": []}
+            plan_data[plan] = {"dates": [], "values": [], "subs": []}
         plan_data[plan]["dates"].append(date)
-        plan_data[plan]["values"].append(value if value is not None else 0)
+        # Keep None as None for line breaks (don't convert to 0)
+        plan_data[plan]["values"].append(value)
+        # Get subscriptions for this plan/date
+        subs_value = subs_lookup.get((plan, date), None)
+        plan_data[plan]["subs"].append(subs_value)
     
     # Create figure
     fig = go.Figure()
@@ -106,50 +121,60 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
     for plan in unique_plans:
         if plan in plan_data:
             # Sort by date
-            sorted_pairs = sorted(zip(plan_data[plan]["dates"], plan_data[plan]["values"]))
-            dates = [p[0] for p in sorted_pairs]
-            values = [p[1] for p in sorted_pairs]
+            sorted_data = sorted(zip(
+                plan_data[plan]["dates"], 
+                plan_data[plan]["values"],
+                plan_data[plan]["subs"]
+            ))
+            dates = [p[0] for p in sorted_data]
+            values = [p[1] for p in sorted_data]
+            subs = [p[2] for p in sorted_data]
             
             base_color = color_map.get(plan, "#6B7280")
             line_color = hex_to_rgba(base_color, LINE_OPACITY)
             
-            # Custom hover template with full date
-            if format_type == "dollar":
+            # Build hover template
+            if is_subscriptions_chart:
+                # Subscriptions chart - just show value, no duplicate
                 hover_template = (
-                    f'<b>{plan}</b><br>'
-                    f'Date: %{{x|%B %d, %Y}}<br>'
-                    f'Value: $%{{y:,.2f}}'
+                    f'<b style="color:{base_color};">●</b> {plan} - %{{y:,.0f}}'
                     f'<extra></extra>'
                 )
-            elif format_type == "percent":
-                hover_template = (
-                    f'<b>{plan}</b><br>'
-                    f'Date: %{{x|%B %d, %Y}}<br>'
-                    f'Value: %{{y:.2%}}'
-                    f'<extra></extra>'
-                )
+                customdata = None
             else:
-                hover_template = (
-                    f'<b>{plan}</b><br>'
-                    f'Date: %{{x|%B %d, %Y}}<br>'
-                    f'Value: %{{y:,.0f}}'
-                    f'<extra></extra>'
-                )
+                # Other charts - show value and subscriptions
+                if format_type == "dollar":
+                    hover_template = (
+                        f'<b style="color:{base_color};">●</b> {plan} - $%{{y:,.2f}} - %{{customdata:,.0f}} Subs'
+                        f'<extra></extra>'
+                    )
+                elif format_type == "percent":
+                    hover_template = (
+                        f'<b style="color:{base_color};">●</b> {plan} - %{{y:.2%}} - %{{customdata:,.0f}} Subs'
+                        f'<extra></extra>'
+                    )
+                else:
+                    hover_template = (
+                        f'<b style="color:{base_color};">●</b> {plan} - %{{y:,.0f}} - %{{customdata:,.0f}} Subs'
+                        f'<extra></extra>'
+                    )
+                customdata = subs
             
             fig.add_trace(
                 go.Scatter(
                     x=dates,
                     y=values,
-                    mode='lines',  # No markers, just lines
+                    mode='lines',
                     name=plan,
                     line=dict(
                         color=line_color,
                         width=LINE_WIDTH,
-                        shape='linear'  # Sharp corners (not spline)
+                        shape='linear'
                     ),
                     hovertemplate=hover_template,
+                    customdata=customdata,
                     showlegend=False,
-                    connectgaps=False  # Don't connect gaps in data
+                    connectgaps=False  # Don't connect gaps - line breaks at None
                 )
             )
     
@@ -174,6 +199,16 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
         height=350,
         margin=dict(l=60, r=20, t=20, b=50),
         hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor=colors["card_bg"],
+            bordercolor=colors["border"],
+            font=dict(
+                family="Inter, sans-serif",
+                size=12,
+                color=colors["text_primary"]
+            ),
+            namelength=-1
+        ),
         paper_bgcolor=colors["card_bg"],
         plot_bgcolor=colors["card_bg"],
         font=dict(
@@ -185,9 +220,10 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
             gridcolor=colors["border"],
             linecolor=colors["border"],
             tickfont=dict(color=colors["text_secondary"]),
-            tickformat="%b %Y",  # Month Year format (Jan 2024)
+            tickformat="%b %Y",
             range=xaxis_range,
-            fixedrange=False  # Allow zoom on x-axis
+            fixedrange=False,
+            hoverformat="%B %d, %Y"  # Full date format in tooltip header
         ),
         yaxis=dict(
             gridcolor=colors["border"],
@@ -195,20 +231,19 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
             tickfont=dict(color=colors["text_secondary"]),
             tickprefix=yaxis_tickprefix,
             tickformat=yaxis_tickformat,
-            fixedrange=False  # Allow zoom on y-axis
+            fixedrange=False
         ),
         legend=dict(
             font=dict(color=colors["text_primary"]),
             bgcolor="rgba(0,0,0,0)"
         ),
-        # Enable drag modes for zoom/pan
-        dragmode="zoom"  # Default to zoom mode
+        dragmode="zoom"
     )
     
     return fig, unique_plans
 
 
-def render_chart_pair(chart_data_regular, chart_data_crystal, display_name, format_type="dollar", date_range=None, chart_key=""):
+def render_chart_pair(chart_data_regular, chart_data_crystal, display_name, format_type="dollar", date_range=None, chart_key="", subscriptions_regular=None, subscriptions_crystal=None):
     """
     Render a pair of charts (Regular and Crystal Ball) side by side
     
@@ -219,79 +254,15 @@ def render_chart_pair(chart_data_regular, chart_data_crystal, display_name, form
         format_type: 'dollar', 'percent', or 'number'
         date_range: Tuple of (from_date, to_date) for x-axis
         chart_key: Unique key prefix for this chart pair
+        subscriptions_regular: Subscriptions data for regular chart tooltip
+        subscriptions_crystal: Subscriptions data for crystal ball chart tooltip
     """
     
     colors = get_theme_colors()
     
+    # Check if this is the Subscriptions chart
+    is_subscriptions_chart = "Subscriptions" in display_name
+    
     col1, col2 = st.columns(2)
     
-    # Chart configuration with zoom, pan, and download enabled
-    # SCROLL ZOOM DISABLED to prevent interference with page scrolling
-    chart_config = {
-        'displayModeBar': True,
-        'displaylogo': False,
-        'modeBarButtonsToAdd': ['downloadCsv'],
-        'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-        'toImageButtonOptions': {
-            'format': 'png',
-            'filename': f'{display_name}_chart',
-            'height': 600,
-            'width': 800,
-            'scale': 2
-        },
-        'scrollZoom': False  # DISABLED - prevents scroll hijacking
-    }
-    
-    # Regular chart
-    with col1:
-        st.markdown(
-            f'<div style="font-size:16px;font-weight:600;color:{colors["text_primary"]};margin-bottom:12px;">{display_name}</div>',
-            unsafe_allow_html=True
-        )
-        
-        fig_regular, plans_regular = build_line_chart(
-            chart_data_regular, 
-            display_name, 
-            format_type,
-            date_range
-        )
-        
-        # Render legend
-        if plans_regular:
-            color_map = build_plan_color_map(plans_regular)
-            st.markdown(build_legend_html(plans_regular, color_map), unsafe_allow_html=True)
-        
-        # Use unique key for each chart
-        st.plotly_chart(
-            fig_regular, 
-            use_container_width=True, 
-            config=chart_config,
-            key=f"{chart_key}_regular"
-        )
-    
-    # Crystal Ball chart
-    with col2:
-        st.markdown(
-            f'<div style="font-size:16px;font-weight:600;color:{colors["text_primary"]};margin-bottom:12px;">{display_name} (Crystal Ball)</div>',
-            unsafe_allow_html=True
-        )
-        
-        fig_crystal, plans_crystal = build_line_chart(
-            chart_data_crystal, 
-            f"{display_name} (Crystal Ball)", 
-            format_type,
-            date_range
-        )
-        
-        # Render legend
-        if plans_crystal:
-            color_map = build_plan_color_map(plans_crystal)
-            st.markdown(build_legend_html(plans_crystal, color_map), unsafe_allow_html=True)
-        
-        # Use unique key for each chart
-        st.plotly_chart(
-            fig_crystal, 
-            use_container_width=True, 
-            config=chart_config,
-            key=f"{chart_key}_crystal"
-        )
+    # Chart configuration with zoom, pan, and download e
