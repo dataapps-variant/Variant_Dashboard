@@ -62,44 +62,39 @@ def render_logo_header(size="large", show_title=True, show_welcome=False, userna
     title_size = "28px" if size == "large" else "20px"
     
     logo_base64 = get_logo_base64()
-    
-    # Container start
-    st.markdown(
-        f'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 0;text-align:center;">',
-        unsafe_allow_html=True
-    )
+    # Build HTML content
+    html_parts = []
     
     # Logo
     if logo_base64:
         filter_style = "invert(1)" if theme == "dark" else "invert(0)"
-        st.markdown(
-            f'<img src="data:image/png;base64,{logo_base64}" style="width:{logo_size};height:auto;filter:{filter_style};" alt="Variant Logo"/>',
-            unsafe_allow_html=True
+        html_parts.append(
+            f'<img src="data:image/png;base64,{logo_base64}" style="width:{logo_size};height:auto;filter:{filter_style};" alt="Variant Logo"/>'
         )
     else:
         # Fallback: Styled V
-        st.markdown(
-            f'<div style="width:{logo_size};height:{logo_size};background:{colors["accent"]};border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:bold;color:white;margin:0 auto;">V</div>',
-            unsafe_allow_html=True
+        html_parts.append(
+            f'<div style="width:{logo_size};height:{logo_size};background:{colors["accent"]};border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:bold;color:white;">V</div>'
         )
     
     # Title
     if show_title:
-        st.markdown(
-            f'<h1 style="font-size:{title_size};font-weight:700;color:{colors["text_primary"]};margin:16px 0 0 0;letter-spacing:3px;">VARIANT GROUP</h1>',
-            unsafe_allow_html=True
+        html_parts.append(
+            f'<h1 style="font-size:{title_size};font-weight:700;color:{colors["text_primary"]};margin:16px 0 0 0;letter-spacing:3px;">VARIANT GROUP</h1>'
         )
     
     # Welcome message
     if show_welcome and username:
-        st.markdown(
-            f'<p style="font-size:16px;color:{colors["text_secondary"]};margin:8px 0 0 0;font-weight:400;">Welcome back, {username}</p>',
-            unsafe_allow_html=True
+        html_parts.append(
+            f'<p style="font-size:16px;color:{colors["text_secondary"]};margin:8px 0 0 0;font-weight:400;">Welcome back, {username}</p>'
         )
     
-    # Container end
-    st.markdown('</div>', unsafe_allow_html=True)
-
+    # Combine into single container
+    html_content = ''.join(html_parts)
+    st.markdown(
+        f'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 0;text-align:center;">{html_content}</div>',
+        unsafe_allow_html=True
+    )
 
 def render_loading_animation(progress=50):
     """
