@@ -1,13 +1,13 @@
 """
 Chart Components for Variant Analytics Dashboard
 
-Key Features:
-- Scroll zoom DISABLED on charts (page scrolls instead)
-- Zoom only available in Fullscreen mode
-- Toolbar: Fullscreen, PDF Export, PNG Download
-- 1px line width
-- 70% opacity
-- Legend above chart
+Customizations:
+- Zoom & Pan enabled
+- Download CSV button
+- Thin lines (1px) with semi-transparency
+- X-axis: Month Year format (Jan 2024)
+- Tooltip: Full date on hover
+- Lines start from first data point
 """
 
 import plotly.graph_objects as go
@@ -26,36 +26,36 @@ def hex_to_rgba(hex_color, opacity=1.0):
 
 
 def build_legend_html(plans, color_map):
-    """Build HTML for legend box above chart"""
+    """Build HTML for legend box"""
     colors = get_theme_colors()
     
     legend_items = []
     for plan in plans:
         color = color_map.get(plan, "#6B7280")
         legend_items.append(
-            f'<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px;">'
+            f'<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: {colors["text_primary"]};">'
             f'<span style="width: 10px; height: 10px; border-radius: 50%; background-color: {color};"></span>'
             f'{plan}'
             f'</span>'
         )
     
-    return f'''
+    html = f'''
     <div style="
         background: {colors['surface']};
         border: 1px solid {colors['border']};
         border-radius: 8px;
         padding: 10px 16px;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
         max-height: 60px;
         overflow-y: auto;
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
-        color: {colors['text_primary']};
     ">
         {"".join(legend_items)}
     </div>
     '''
+    return html
 
 
 def build_line_chart(data, display_name, format_type="dollar", date_range=None):
@@ -113,7 +113,7 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
     # Create figure
     fig = go.Figure()
     
-    # Line styling
+    # Line opacity for semi-transparency
     LINE_OPACITY = 0.7
     LINE_WIDTH = 1  # Thin lines
     
@@ -128,7 +128,7 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
             base_color = color_map.get(plan, "#6B7280")
             line_color = hex_to_rgba(base_color, LINE_OPACITY)
             
-            # Custom hover template
+            # Custom hover template with full date
             if format_type == "dollar":
                 hover_template = (
                     f'<b>{plan}</b><br>'
@@ -155,16 +155,16 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
                 go.Scatter(
                     x=dates,
                     y=values,
-                    mode='lines',
+                    mode='lines',  # No markers, just lines
                     name=plan,
                     line=dict(
                         color=line_color,
                         width=LINE_WIDTH,
-                        shape='linear'
+                        shape='linear'  # Sharp corners (not spline)
                     ),
                     hovertemplate=hover_template,
-                    showlegend=False,  # Using custom legend
-                    connectgaps=False
+                    showlegend=False,
+                    connectgaps=False  # Don't connect gaps in data
                 )
             )
     
@@ -184,7 +184,7 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
     if date_range:
         xaxis_range = [date_range[0], date_range[1]]
     
-    # Update layout - FIXED RANGE to disable scroll zoom
+    # Update layout
     fig.update_layout(
         height=350,
         margin=dict(l=60, r=20, t=20, b=50),
@@ -200,9 +200,9 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
             gridcolor=colors["border"],
             linecolor=colors["border"],
             tickfont=dict(color=colors["text_secondary"]),
-            tickformat="%b %Y",
+            tickformat="%b %Y",  # Month Year format (Jan 2024)
             range=xaxis_range,
-            fixedrange=True  # DISABLE zoom on x-axis
+            fixedrange=False  # Allow zoom on x-axis
         ),
         yaxis=dict(
             gridcolor=colors["border"],
@@ -210,13 +210,14 @@ def build_line_chart(data, display_name, format_type="dollar", date_range=None):
             tickfont=dict(color=colors["text_secondary"]),
             tickprefix=yaxis_tickprefix,
             tickformat=yaxis_tickformat,
-            fixedrange=True  # DISABLE zoom on y-axis
+            fixedrange=False  # Allow zoom on y-axis
         ),
         legend=dict(
             font=dict(color=colors["text_primary"]),
             bgcolor="rgba(0,0,0,0)"
         ),
-        dragmode=False  # Disable drag modes
+        # Enable drag modes for zoom/pan
+        dragmode="zoom"  # Default to zoom mode
     )
     
     return fig, unique_plans
@@ -237,46 +238,35 @@ def render_chart_pair(chart_data_regular, chart_data_crystal, display_name, form
     
     colors = get_theme_colors()
     
-    # Chart config - scroll zoom DISABLED
+    col1, col2 = st.columns(2)
+    
+    # Chart configuration with zoom, pan, and download enabled
+    # SCROLL ZOOM DISABLED to prevent interference with page scrolling
     chart_config = {
         'displayModeBar': True,
         'displaylogo': False,
-        'modeBarButtonsToRemove': [
-            'zoom2d', 'pan2d', 'select2d', 'lasso2d', 
-            'zoomIn2d', 'zoomOut2d', 'autoScale2d'
-        ],
+        'modeBarButtonsToAdd': ['downloadCsv'],
+        'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
         'toImageButtonOptions': {
             'format': 'png',
             'filename': f'{display_name}_chart',
-            'height': 600,
-            'width': 1000,
+            'height': 500,
+            'width': 800,
             'scale': 2
         },
-        'scrollZoom': False  # DISABLE scroll zoom
+        'scrollZoom': False  # DISABLED - prevents scroll hijacking
     }
-    
-    col1, col2 = st.columns(2)
     
     # Regular chart
     with col1:
-        # Title and toolbar row
-        title_col, btn_col = st.columns([5, 1])
-        
-        with title_col:
-            st.markdown(f'''
-            <div style="font-size: 16px; font-weight: 600; color: {colors['text_primary']}; margin-bottom: 8px;">
-                {display_name}
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with btn_col:
-            with st.popover("⋮"):
-                if st.button("⛶ Fullscreen", key=f"{chart_key}_r_fs", use_container_width=True):
-                    st.session_state[f"{chart_key}_r_fullscreen"] = True
-                if st.button("📄 Export PDF", key=f"{chart_key}_r_pdf", use_container_width=True):
-                    st.info("PDF export - Coming soon")
-                if st.button("📥 Download PNG", key=f"{chart_key}_r_png", use_container_width=True):
-                    st.info("Use camera icon on chart")
+        st.markdown(f'''
+        <div style="
+            font-size: 16px;
+            font-weight: 600;
+            color: {colors['text_primary']};
+            margin-bottom: 12px;
+        ">{display_name}</div>
+        ''', unsafe_allow_html=True)
         
         fig_regular, plans_regular = build_line_chart(
             chart_data_regular, 
@@ -290,33 +280,24 @@ def render_chart_pair(chart_data_regular, chart_data_crystal, display_name, form
             color_map = build_plan_color_map(plans_regular)
             st.markdown(build_legend_html(plans_regular, color_map), unsafe_allow_html=True)
         
+        # Use unique key for each chart
         st.plotly_chart(
             fig_regular, 
             use_container_width=True, 
             config=chart_config,
-            key=f"{chart_key}_r"
+            key=f"{chart_key}_regular"
         )
     
     # Crystal Ball chart
     with col2:
-        # Title and toolbar row
-        title_col, btn_col = st.columns([5, 1])
-        
-        with title_col:
-            st.markdown(f'''
-            <div style="font-size: 16px; font-weight: 600; color: {colors['text_primary']}; margin-bottom: 8px;">
-                {display_name} (Crystal Ball)
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with btn_col:
-            with st.popover("⋮"):
-                if st.button("⛶ Fullscreen", key=f"{chart_key}_c_fs", use_container_width=True):
-                    st.session_state[f"{chart_key}_c_fullscreen"] = True
-                if st.button("📄 Export PDF", key=f"{chart_key}_c_pdf", use_container_width=True):
-                    st.info("PDF export - Coming soon")
-                if st.button("📥 Download PNG", key=f"{chart_key}_c_png", use_container_width=True):
-                    st.info("Use camera icon on chart")
+        st.markdown(f'''
+        <div style="
+            font-size: 16px;
+            font-weight: 600;
+            color: {colors['text_primary']};
+            margin-bottom: 12px;
+        ">{display_name} (Crystal Ball)</div>
+        ''', unsafe_allow_html=True)
         
         fig_crystal, plans_crystal = build_line_chart(
             chart_data_crystal, 
@@ -330,9 +311,10 @@ def render_chart_pair(chart_data_regular, chart_data_crystal, display_name, form
             color_map = build_plan_color_map(plans_crystal)
             st.markdown(build_legend_html(plans_crystal, color_map), unsafe_allow_html=True)
         
+        # Use unique key for each chart
         st.plotly_chart(
             fig_crystal, 
             use_container_width=True, 
             config=chart_config,
-            key=f"{chart_key}_c"
+            key=f"{chart_key}_crystal"
         )
