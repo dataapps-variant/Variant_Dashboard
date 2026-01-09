@@ -200,7 +200,7 @@ def render_filters(plan_groups, min_date, max_date, key_prefix=""):
                         selected = render_plan_group(app_name, plans, key_prefix)
                         selected_plans.extend(selected)
         
-     with main_cols[1]:
+with main_cols[1]:
             selected_metrics = render_metrics_filter(key_prefix)
         
         # Bottom row: Apply Filter button at extreme right
