@@ -114,7 +114,7 @@ def render_filters(plan_groups, min_date, max_date, key_prefix=""):
     """
     Render all filters in collapsible container
     
-    Returns: (from_date, to_date, selected_bc, selected_cohort, selected_metrics, selected_plans)
+    Returns: (from_date, to_date, selected_bc, selected_cohort, selected_metrics, selected_plans, apply_clicked)
     """
     
     # Group plans by App
@@ -178,9 +178,7 @@ def render_filters(plan_groups, min_date, max_date, key_prefix=""):
                 st.rerun()
         
         # Row 2: Plan Groups + Metrics
-        # Calculate columns: up to 6 app columns + 1 metrics column
         num_apps = len(app_names)
-        apps_per_row = min(6, num_apps)
         
         # Plans section header
         st.markdown('<div class="filter-title">Plan Groups</div>', unsafe_allow_html=True)
@@ -200,7 +198,7 @@ def render_filters(plan_groups, min_date, max_date, key_prefix=""):
                         selected = render_plan_group(app_name, plans, key_prefix)
                         selected_plans.extend(selected)
         
-with main_cols[1]:
+        with main_cols[1]:
             selected_metrics = render_metrics_filter(key_prefix)
         
         # Bottom row: Apply Filter button at extreme right
