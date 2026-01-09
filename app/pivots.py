@@ -10,6 +10,9 @@ OPTIMIZED VERSION - Changes made:
 6. Set enableRangeSelection=False
 7. Simplified CSS (removed 2 minor rules)
 8. Kept frozen columns (App, Plan, Metric) with built-in pinned="left"
+9. 2 decimal places for all numbers
+10. Right-aligned date columns
+11. Flex sizing for frozen columns (auto-adjust width)
 """
 
 import streamlit as st
@@ -20,7 +23,7 @@ from theme import get_theme_colors, get_current_theme
 
 
 def format_metric_value(value, metric_name):
-    """Format value based on metric type"""
+    """Format value based on metric type - rounded to 2 decimal places"""
     if value is None or pd.isna(value):
         return None
     
@@ -29,8 +32,8 @@ def format_metric_value(value, metric_name):
     
     try:
         if format_type == "percent":
-            return float(value) * 100
-        return float(value)
+            return round(float(value) * 100, 2)  # 2 decimal places
+        return round(float(value), 2)  # 2 decimal places
     except:
         return None
 
@@ -140,6 +143,9 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
     - No sparklines
     - No animations (animateRows=False)
     - No range selection (enableRangeSelection=False)
+    - 2 decimal places for numbers
+    - Right-aligned date columns
+    - Flex sizing for frozen columns
     """
     
     colors = get_theme_colors()
@@ -191,12 +197,11 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         autoHeight=False
     )
     
-    # App column - frozen, with filter/sort (built-in, no JsCode)
+    # App column - frozen, with filter/sort, flex sizing
     gb.configure_column(
         "App",
         pinned="left",
-        minWidth=60,
-        maxWidth=100,
+        flex=1,  # Flex sizing - auto adjusts
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
@@ -206,12 +211,11 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         }
     )
     
-    # Plan column - frozen, with filter/sort (built-in, no JsCode)
+    # Plan column - frozen, with filter/sort, flex sizing
     gb.configure_column(
         "Plan",
         pinned="left",
-        minWidth=80,
-        maxWidth=150,
+        flex=2,  # Flex sizing - auto adjusts
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
@@ -221,12 +225,11 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         }
     )
     
-    # Metric column - frozen, with filter/sort (built-in, no JsCode)
+    # Metric column - frozen, with filter/sort, flex sizing
     gb.configure_column(
         "Metric",
         pinned="left",
-        minWidth=100,
-        maxWidth=180,
+        flex=2,  # Flex sizing - auto adjusts
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
@@ -236,13 +239,14 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         }
     )
     
-    # Date columns - using built-in numeric type (no JsCode valueFormatter)
+    # Date columns - right aligned, numeric type
     for date_col in date_columns:
         gb.configure_column(
             date_col,
             type=["numericColumn"],
             minWidth=85,
-            maxWidth=120
+            maxWidth=120,
+            cellStyle={"textAlign": "right"}  # Right-aligned
         )
     
     # Grid options - OPTIMIZED (no animations, no range selection)
