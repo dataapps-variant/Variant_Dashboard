@@ -173,38 +173,38 @@ def render_dashboard_content_optimized(active_inactive, key_prefix):
         return
     
     # ==========================================================================
-    # PIVOT TABLES (in expander for lazy loading)
+    # PIVOT TABLES - STACKED VERTICALLY (one below another)
     # ==========================================================================
     st.markdown("<br>", unsafe_allow_html=True)
     
     with st.expander("📊 Pivot Tables", expanded=True):
-        pivot_col1, pivot_col2 = st.columns(2)
+        # Regular pivot table
+        try:
+            pivot_data_regular = load_pivot_data(
+                from_date, to_date, selected_bc, selected_cohort,
+                selected_plans, selected_metrics, "Regular", active_inactive
+            )
+            render_pivot_table(
+                pivot_data_regular, selected_metrics, 
+                "📊 Plan Overview (Regular)", f"{key_prefix}regular"
+            )
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
         
-        with pivot_col1:
-            try:
-                pivot_data_regular = load_pivot_data(
-                    from_date, to_date, selected_bc, selected_cohort,
-                    selected_plans, selected_metrics, "Regular", active_inactive
-                )
-                render_pivot_table(
-                    pivot_data_regular, selected_metrics, 
-                    "📊 Regular", f"{key_prefix}regular"
-                )
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        with pivot_col2:
-            try:
-                pivot_data_crystal = load_pivot_data(
-                    from_date, to_date, selected_bc, selected_cohort,
-                    selected_plans, selected_metrics, "Crystal Ball", active_inactive
-                )
-                render_pivot_table(
-                    pivot_data_crystal, selected_metrics,
-                    "🔮 Crystal Ball", f"{key_prefix}crystal"
-                )
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+        # Crystal Ball pivot table - BELOW the Regular one
+        try:
+            pivot_data_crystal = load_pivot_data(
+                from_date, to_date, selected_bc, selected_cohort,
+                selected_plans, selected_metrics, "Crystal Ball", active_inactive
+            )
+            render_pivot_table(
+                pivot_data_crystal, selected_metrics,
+                "🔮 Plan Overview (Crystal Ball)", f"{key_prefix}crystal"
+            )
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
     
     # ==========================================================================
     # CHARTS - BATCH LOADING (MAJOR OPTIMIZATION)
