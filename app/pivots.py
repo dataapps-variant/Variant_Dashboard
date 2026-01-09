@@ -10,20 +10,24 @@ OPTIMIZED VERSION - Changes made:
 6. Simplified CSS (removed 2 minor rules)
 7. Kept frozen columns (App, Plan, Metric) with built-in pinned="left"
 8. 2 decimal places for all numbers
-9. Right-aligned date columns
+9. Right-aligned date columns (fixed)
 10. Smart fixed widths for frozen columns
 11. REMOVED @st.cache_data from process_pivot_data_for_aggrid (was causing stuck pivot bug)
+12. Rebills - no decimals in Crystal Ball tables only
 """
 
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 import pandas as pd
 from config import METRICS_CONFIG
 from theme import get_theme_colors, get_current_theme
 
 
-def format_metric_value(value, metric_name):
-    """Format value based on metric type - rounded to 2 decimal places"""
+def format_metric_value(value, metric_name, is_crystal_ball=False):
+    """Format value based on metric type - rounded to 2 decimal places
+    
+    Special case: Rebills in Crystal Ball = no decimals
+    """
     if value is None or pd.isna(value):
         return None
     
@@ -31,6 +35,10 @@ def format_metric_value(value, metric_name):
     format_type = config.get("format", "number")
     
     try:
+        # Special case: Rebills in Crystal Ball = no decimals
+        if metric_name == "Rebills" and is_crystal_ball:
+            return round(float(value))  # No decimals
+        
         if format_type == "percent":
             return round(float(value) * 100, 2)  # 2 decimal places
         return round(float(value), 2)  # 2 decimal places
@@ -46,12 +54,17 @@ def get_display_metric_name(metric_name):
     return f"{display}{suffix}"
 
 
-def process_pivot_data_for_aggrid(pivot_data, selected_metrics):
+def process_pivot_data_for_aggrid(pivot_data, selected_metrics, is_crystal_ball=False):
     """
     Process pivot data into flat DataFrame for AG Grid
     
     NOTE: NO @st.cache_data here - was causing stuck pivot bug!
     The heavy caching is done at BigQuery/GCS level, this function is fast.
+    
+    Args:
+        pivot_data: Raw pivot data
+        selected_metrics: List of metrics to display
+        is_crystal_ball: If True, Rebills will have no decimals
     """
     
     if not pivot_data or "Reporting_Date" not in pivot_data or len(pivot_data["Reporting_Date"]) == 0:
@@ -112,7 +125,7 @@ def process_pivot_data_for_aggrid(pivot_data, selected_metrics):
                 formatted_date = date_map[date]
                 key = (app_name, plan_name, date)
                 raw_value = lookup.get(key, {}).get(metric, None)
-                formatted_value = format_metric_value(raw_value, metric)
+                formatted_value = format_metric_value(raw_value, metric, is_crystal_ball)
                 row[formatted_date] = formatted_value
             
             rows.append(row)
@@ -144,13 +157,17 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
     - 2 decimal places for numbers
     - Right-aligned date columns
     - Smart fixed widths for frozen columns
+    - Rebills no decimals in Crystal Ball only
     """
     
     colors = get_theme_colors()
     theme = get_current_theme()
     
+    # Check if this is Crystal Ball table
+    is_crystal_ball = "crystal" in table_id.lower() or "crystal ball" in title.lower()
+    
     # Process data (NO caching here - fixes stuck pivot bug)
-    df, date_columns = process_pivot_data_for_aggrid(pivot_data, selected_metrics)
+    df, date_columns = process_pivot_data_for_aggrid(pivot_data, selected_metrics, is_crystal_ball)
     
     if df is None or df.empty:
         st.subheader(title)
@@ -240,6 +257,13 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         }
     )
     
+    # Right-align cell style using JsCode (proper AG Grid method)
+    right_align_style = JsCode("""
+        function(params) {
+            return {'textAlign': 'right'};
+        }
+    """)
+    
     # Date columns - right aligned, numeric type
     for date_col in date_columns:
         gb.configure_column(
@@ -247,7 +271,7 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
             type=["numericColumn"],
             minWidth=85,
             maxWidth=120,
-            cellStyle={"textAlign": "right"}  # Right-aligned
+            cellStyle=right_align_style
         )
     
     # Grid options - OPTIMIZED (no animations, no range selection)
