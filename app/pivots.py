@@ -1,26 +1,20 @@
 """
 Pivot Table Components for Variant Analytics Dashboard
 
-Column Widths:
-- App: 150px
-- Plan: 150px
-- Metric: 180px
-- Trend: 180px
-- Date columns: 100px each
-
-Features:
-- First 4 columns frozen
-- No text wrapping by default, wraps if user resizes smaller
-- Excel-like filter/sort ONLY on App, Plan, Metric
-- Single scrollable table (no pagination)
-- Auto-size columns to fit content
+OPTIMIZED VERSION - Changes made:
+1. Removed sparklines/Trend column
+2. Removed Excel export (CSV only)
+3. Removed JsCode valueFormatter (using built-in)
+4. Added @st.cache_data for data processing
+5. Set animateRows=False
+6. Set enableRangeSelection=False
+7. Simplified CSS (removed 2 minor rules)
+8. Kept frozen columns (App, Plan, Metric) with built-in pinned="left"
 """
 
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import pandas as pd
-import json
-import io
 from config import METRICS_CONFIG
 from theme import get_theme_colors, get_current_theme
 
@@ -34,14 +28,9 @@ def format_metric_value(value, metric_name):
     format_type = config.get("format", "number")
     
     try:
-        if format_type == "number":
-            return float(value)
-        elif format_type == "percent":
+        if format_type == "percent":
             return float(value) * 100
-        elif format_type == "dollar":
-            return float(value)
-        else:
-            return float(value)
+        return float(value)
     except:
         return None
 
@@ -54,8 +43,15 @@ def get_display_metric_name(metric_name):
     return f"{display}{suffix}"
 
 
-def process_pivot_data_for_aggrid(pivot_data, selected_metrics):
-    """Process pivot data into flat DataFrame for AG Grid"""
+@st.cache_data(ttl=1800)
+def process_pivot_data_for_aggrid(_pivot_data, selected_metrics):
+    """
+    Process pivot data into flat DataFrame for AG Grid
+    CACHED for 30 minutes
+    
+    Note: _pivot_data has underscore prefix to tell Streamlit not to hash it
+    """
+    pivot_data = _pivot_data
     
     if not pivot_data or "Reporting_Date" not in pivot_data or len(pivot_data["Reporting_Date"]) == 0:
         return None, []
@@ -100,7 +96,7 @@ def process_pivot_data_for_aggrid(pivot_data, selected_metrics):
             if metric in pivot_data:
                 lookup[key][metric] = pivot_data[metric][i]
     
-    # Build rows for DataFrame
+    # Build rows for DataFrame (NO Trend column)
     rows = []
     for app_name, plan_name in plan_combos:
         for metric in selected_metrics:
@@ -111,22 +107,19 @@ def process_pivot_data_for_aggrid(pivot_data, selected_metrics):
                 "_metric_key": metric
             }
             
-            sparkline_values = []
-            
             for date in unique_dates:
                 formatted_date = date_map[date]
                 key = (app_name, plan_name, date)
                 raw_value = lookup.get(key, {}).get(metric, None)
                 formatted_value = format_metric_value(raw_value, metric)
                 row[formatted_date] = formatted_value
-                sparkline_values.insert(0, formatted_value)
             
-            row["Trend"] = json.dumps([v for v in sparkline_values if v is not None])
             rows.append(row)
     
     df = pd.DataFrame(rows)
     
-    column_order = ["App", "Plan", "Metric", "Trend"] + date_columns
+    # Column order: App, Plan, Metric, then date columns (NO Trend)
+    column_order = ["App", "Plan", "Metric"] + date_columns
     if "_metric_key" in df.columns:
         column_order.append("_metric_key")
     
@@ -136,11 +129,23 @@ def process_pivot_data_for_aggrid(pivot_data, selected_metrics):
 
 
 def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
-    """Render pivot table using AG Grid"""
+    """
+    Render pivot table using AG Grid
+    
+    Features:
+    - Frozen columns: App, Plan, Metric (built-in pinned="left")
+    - Filtering on App, Plan, Metric (built-in agSetColumnFilter)
+    - Sorting enabled
+    - CSV export only
+    - No sparklines
+    - No animations (animateRows=False)
+    - No range selection (enableRangeSelection=False)
+    """
     
     colors = get_theme_colors()
     theme = get_current_theme()
     
+    # Process data (CACHED)
     df, date_columns = process_pivot_data_for_aggrid(pivot_data, selected_metrics)
     
     if df is None or df.empty:
@@ -148,14 +153,9 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         st.info("No data available for selected filters.")
         return
     
-    # Prepare export data
-    df_export = df.drop(columns=["_metric_key", "Trend"], errors='ignore')
+    # Prepare CSV export data
+    df_export = df.drop(columns=["_metric_key"], errors='ignore')
     csv_data = df_export.to_csv(index=False)
-    
-    buffer = io.BytesIO()
-    df_export.to_excel(buffer, index=False, engine='openpyxl')
-    buffer.seek(0)
-    excel_data = buffer.getvalue()
     
     # Title and menu row
     col_title, col_menu = st.columns([10, 1])
@@ -165,7 +165,7 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
     
     with col_menu:
         with st.popover("⋮"):
-            st.markdown("**Export Options**")
+            st.markdown("**Export**")
             
             clean_title = title.replace('📊', '').replace('🔮', '').strip().replace(' ', '_')
             
@@ -177,212 +177,85 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
                 key=f"{table_id}_csv_export",
                 use_container_width=True
             )
-            
-            st.download_button(
-                label="📥 Download Excel",
-                data=excel_data,
-                file_name=f"{clean_title}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"{table_id}_excel_export",
-                use_container_width=True
-            )
     
     # Configure AG Grid
     gb = GridOptionsBuilder.from_dataframe(df.drop(columns=["_metric_key"], errors='ignore'))
     
-    # Default column settings - NO filter/sort
+    # Default column settings - NO JsCode
     gb.configure_default_column(
         resizable=True,
         filterable=False,
         sortable=False,
         suppressMenu=True,
-        wrapText=True,
+        wrapText=False,
         autoHeight=False
     )
     
-    # Sparkline renderer
-    sparkline_renderer = JsCode("""
-    class SparklineRenderer {
-        init(params) {
-            this.eGui = document.createElement('div');
-            this.eGui.style.width = '100%';
-            this.eGui.style.height = '100%';
-            this.eGui.style.display = 'flex';
-            this.eGui.style.alignItems = 'center';
-            this.eGui.style.justifyContent = 'center';
-            
-            let values = [];
-            try {
-                if (typeof params.value === 'string') {
-                    values = JSON.parse(params.value);
-                } else if (Array.isArray(params.value)) {
-                    values = params.value;
-                }
-            } catch (e) {
-                values = [];
-            }
-            
-            if (!values || values.length === 0) {
-                this.eGui.innerHTML = '<span style="color: #666;">-</span>';
-                return;
-            }
-            
-            const validValues = values.filter(v => v !== null && v !== undefined && !isNaN(v)).map(Number);
-            
-            if (validValues.length < 2) {
-                this.eGui.innerHTML = '<span style="color: #666;">-</span>';
-                return;
-            }
-            
-            const width = 100;
-            const height = 24;
-            const padding = 3;
-            
-            const min = Math.min(...validValues);
-            const max = Math.max(...validValues);
-            const range = max - min || 1;
-            
-            const points = validValues.map((v, i) => {
-                const x = padding + (i / (validValues.length - 1)) * (width - 2 * padding);
-                const y = height - padding - ((v - min) / range) * (height - 2 * padding);
-                return `${x},${y}`;
-            }).join(' ');
-            
-            const firstVal = validValues[0];
-            const lastVal = validValues[validValues.length - 1];
-            const color = lastVal >= firstVal ? '#10B981' : '#EF4444';
-            
-            this.eGui.innerHTML = `
-                <svg width="${width}" height="${height}" style="overflow: visible;">
-                    <polyline
-                        points="${points}"
-                        fill="none"
-                        stroke="${color}"
-                        stroke-width="1.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    />
-                </svg>
-            `;
-        }
-        
-        getGui() {
-            return this.eGui;
-        }
-        
-        refresh(params) {
-            return false;
-        }
-    }
-    """)
-    
-    # App column - frozen, with filter/sort
+    # App column - frozen, with filter/sort (built-in, no JsCode)
     gb.configure_column(
         "App",
         pinned="left",
         minWidth=60,
+        maxWidth=100,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
-        wrapText=True,
-        autoHeight=False,
-        cellStyle={'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
         filterParams={
             'buttons': ['reset', 'apply'],
             'closeOnApply': True
         }
     )
     
-    # Plan column - frozen, with filter/sort
+    # Plan column - frozen, with filter/sort (built-in, no JsCode)
     gb.configure_column(
         "Plan",
         pinned="left",
         minWidth=80,
+        maxWidth=150,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
-        wrapText=True,
-        autoHeight=False,
-        cellStyle={'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
         filterParams={
             'buttons': ['reset', 'apply'],
             'closeOnApply': True
         }
     )
     
-    # Metric column - frozen, with filter/sort
+    # Metric column - frozen, with filter/sort (built-in, no JsCode)
     gb.configure_column(
         "Metric",
         pinned="left",
         minWidth=100,
+        maxWidth=180,
         filter="agSetColumnFilter",
         sortable=True,
         suppressMenu=False,
-        wrapText=True,
-        autoHeight=False,
-        cellStyle={'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'},
         filterParams={
             'buttons': ['reset', 'apply'],
             'closeOnApply': True
         }
     )
     
-    # Trend column - frozen, NO filter/sort
-    gb.configure_column(
-        "Trend",
-        pinned="left",
-        minWidth=80,
-        filter=False,
-        sortable=False,
-        suppressMenu=True,
-        cellRenderer=sparkline_renderer,
-        headerName="Trend"
-    )
-    
-    # Number formatter for Indian number system
-    number_formatter = JsCode("""
-        function(params) {
-            if (params.value === null || params.value === undefined || params.value === '') return '';
-            const num = Number(params.value);
-            if (isNaN(num)) return params.value;
-            return num.toLocaleString('en-IN', {maximumFractionDigits: 2});
-        }
-    """)
-    
-    # Date columns - NO filter/sort
+    # Date columns - using built-in numeric type (no JsCode valueFormatter)
     for date_col in date_columns:
         gb.configure_column(
             date_col,
             type=["numericColumn"],
-            filter=False,
-            sortable=False,
-            suppressMenu=True,
-            valueFormatter=number_formatter,
-            minWidth=70,
-            wrapText=True,
-            autoHeight=False,
-            cellStyle={'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis'}
+            minWidth=85,
+            maxWidth=120
         )
     
-    # Auto-size columns callback
-    on_first_data_rendered = JsCode("""
-        function(params) {
-            params.api.autoSizeAllColumns();
-        }
-    """)
-    
-    # Grid options - NO pagination
+    # Grid options - OPTIMIZED (no animations, no range selection)
     gb.configure_grid_options(
         domLayout='normal',
-        enableRangeSelection=True,
-        animateRows=True,
         rowHeight=35,
         headerHeight=40,
         suppressRowClickSelection=True,
         enableCellTextSelection=True,
         ensureDomOrder=True,
-        suppressPaginationPanel=True,
-        onFirstDataRendered=on_first_data_rendered
+        # DISABLED for performance:
+        animateRows=False,
+        enableRangeSelection=False,
     )
     
     gb.configure_pagination(enabled=False)
@@ -390,7 +263,7 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
     
     grid_options = gb.build()
     
-    # Custom CSS
+    # Custom CSS - SIMPLIFIED (removed .ag-icon and .ag-header-cell-menu-button)
     custom_css = {
         ".ag-root-wrapper": {
             "border-radius": "8px !important",
@@ -403,8 +276,7 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         ".ag-header-cell-text": {
             "color": f"{colors['text_primary']} !important",
             "font-weight": "600 !important",
-            "font-size": "12px !important",
-            "white-space": "nowrap !important"
+            "font-size": "12px !important"
         },
         ".ag-cell": {
             "color": f"{colors['text_primary']} !important",
@@ -427,15 +299,6 @@ def render_pivot_table(pivot_data, selected_metrics, title, table_id="pivot"):
         },
         ".ag-pinned-left-header, .ag-pinned-left-cols-container": {
             "border-right": f"2px solid {colors['border']} !important"
-        },
-        ".ag-icon": {
-            "color": f"{colors['text_secondary']} !important"
-        },
-        ".ag-header-cell-menu-button": {
-            "opacity": "0.7 !important"
-        },
-        ".ag-header-cell-menu-button:hover": {
-            "opacity": "1 !important"
         }
     }
     
